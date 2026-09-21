@@ -2,20 +2,27 @@
 
 # Aielia
 
-**An everyday AI assistant that thinks before it acts — and stops before it sends.**
+**Hand it real work. The harness keeps it in bounds.**
+
+<a href="https://myaielia.com"><img src="https://myaielia.com/og-image.png" alt="Aielia — the model proposes, the harness decides: control, budget, verify, recover" width="640"></a>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Built with](https://img.shields.io/badge/built%20with-Build%20A%20Harness-4c1.svg)](https://github.com/3IVIS/buildaharness)
-[![Try it](https://img.shields.io/badge/try%20it-buildaharness.com%2Ftry-orange.svg)](https://buildaharness.com/try)
+[![Website](https://img.shields.io/badge/website-myaielia.com-4F46E5.svg)](https://myaielia.com)
+[![Try it](https://img.shields.io/badge/try%20it-myaielia.com%2Ftry-orange.svg)](https://myaielia.com/try)
 
 </div>
 
 ---
 
-Aielia is the personal assistant built with **[Build A Harness](https://github.com/3IVIS/buildaharness)**.
-It is light enough for "what time zone is Tokyo in?" and careful enough to
-**stop for your approval** before it sends an email, pays an invoice, runs a
-shell command, or deletes a file.
+Aielia is an open-source AI agent built with **[Build A Harness](https://github.com/3IVIS/buildaharness)**.
+Hand it a piece of real, multi-step work — research across a list of items, going
+through the files in a folder, drafting and sending the update — and it works the
+job through, using tools. What keeps it in bounds is not a prompt: it is code
+that runs around the model on every turn, deciding what it may do next, what it
+may believe, whether an answer holds up, and what a job may cost. Anything that
+can't be undone — writing a file, running a command, sending an email — is
+staged as an exact action and applied only on your approval.
 
 The difference is the *harness*. A harness is a governance and reliability
 control plane wrapped around an autonomous agent: the agent has the
@@ -29,16 +36,16 @@ what it is allowed to do, how it catches its own mistakes, and what it learns.
 
 ## Try it
 
-**In your browser → [buildaharness.com/try](https://buildaharness.com/try)**
+**In your browser → [myaielia.com/try](https://myaielia.com/try)**
 
-Bring your own model key (Anthropic / OpenAI / OpenRouter — stored only in
-your browser's `localStorage`, never proxied server-side), or watch the
-approval gate fire before you add one.
+Bring your own model key (Anthropic / OpenAI / OpenRouter). It is stored only in
+your browser's `localStorage` and never proxied server-side. Or watch the
+approval gate fire before you add one. There is no Aielia account.
 
 **In your terminal:**
 
 ```bash
-npx @buildaharness/personal-assistant
+npx @buildaharness/aielia
 ```
 
 First run walks you through picking a model — reuse an existing `claude` CLI
@@ -49,7 +56,7 @@ Then just talk to it.
 
 ```ts
 import { LLMClient } from '@buildaharness/runtime'
-import { PersonalAssistant } from '@buildaharness/personal-assistant'
+import { PersonalAssistant } from '@buildaharness/aielia'
 
 const aielia = new PersonalAssistant({
   llmClient: new LLMClient({ proxyUrl, authToken }),
@@ -69,12 +76,18 @@ One core, three front ends — terminal CLI, browser (`@buildaharness/chat-ui`),
 and native desktop (`@buildaharness/desktop`) — all running the identical
 harness underneath.
 
+> **Status:** early-stage public alpha (`@buildaharness/aielia` 0.3.x). Not an audited
+> security product. File and shell access are opt-in and off by default.
+
 ---
 
-## What makes it different
+## What the harness controls
 
 Most open agents ship either a permission model *or* an output-quality gate.
-Aielia ships both, plus the layers that connect them:
+Aielia ships both, plus the layers that connect them — six things held in place
+by code rather than by a prompt: what it may do, what it may believe, whether the
+answer holds up, what a job may cost, what happens when it goes wrong, and what
+can't be undone.
 
 - **Live per-tool-call ControlState gate** — every read-only tool call is
   checked against a per-turn `ControlState` *before* it runs (deterministic
@@ -84,6 +97,11 @@ Aielia ships both, plus the layers that connect them:
   never execute inline. They stage the *exact* proposed action for approval;
   once you approve, that staged action runs verbatim — no second model call
   can improvise a different one.
+- **Bounded jobs** — for an explicit list of items, each gets its own bounded
+  sub-search (budget calibrated on the first items), three dead ends in a row
+  stop that item, a large batch asks for confirmation before it runs, and a hard
+  per-turn ceiling caps total tool calls. Every item ends `found`, `not_found`,
+  or `truncated_while_productive`, and the reply never silently omits one.
 - **Fail-safe risk classification** — a classifier error or unparseable
   response returns `UNKNOWN → requires approval`, never a silent default to
   low-risk.
@@ -109,7 +127,7 @@ Aielia ships both, plus the layers that connect them:
 
 ## How it's implemented
 
-Aielia is the `@buildaharness/personal-assistant` package. Where a heavy
+Aielia is the `@buildaharness/aielia` package. Where a heavy
 autonomous agent decomposes an objective into a multi-task plan, Aielia
 treats **every chat message as one objective, one task**. That keeps the
 harness cheap per turn — the harness loop itself makes *no* LLM calls, it is
@@ -161,7 +179,7 @@ of the harness is touched on the turns that do run.
 | Front end | Where | Storage |
 |---|---|---|
 | `PersonalAssistant` class | Any Node / browser code | In-memory; bring your own adapter |
-| CLI (`npx @buildaharness/personal-assistant`) | Terminal | Files under `~/.buildaharness/personal-assistant/` |
+| CLI (`npx @buildaharness/aielia`) | Terminal | Files under `~/.buildaharness/personal-assistant/` (directory name kept from before the rename, so existing installs carry over) |
 | `@buildaharness/chat-ui` | Browser | IndexedDB / Dexie |
 | `@buildaharness/desktop` | Native window (Tauri) | Files under the OS app-data dir |
 
@@ -175,14 +193,14 @@ deterministic policy gate is enforced through an ephemeral loopback socket the
 MCP server blocks on before executing a read-only call.
 
 Full write-up:
-[`packages/personal-assistant/README.md`](https://github.com/3IVIS/buildaharness/blob/main/packages/personal-assistant/README.md)
+[`packages/aielia/README.md`](https://github.com/3IVIS/buildaharness/blob/main/packages/aielia/README.md)
 in the Build A Harness repo.
 
 ---
 
 ## Build your own harness
 
-Aielia is the front door. Underneath it is a full visual **harness builder** —
+Aielia is the reference application. Underneath it is a full visual **harness builder** —
 draw the same 11 layers on a canvas, compile to LangGraph / CrewAI / Mastra /
 MS Agent Framework, and trace every decision in Langfuse.
 
@@ -190,7 +208,7 @@ MS Agent Framework, and trace every decision in Langfuse.
 Canvas  →  flow.json  →  LangGraph · CrewAI · Mastra · MS Agent Framework  →  Langfuse
 ```
 
-See **[github.com/3IVIS/buildaharness](https://github.com/3IVIS/buildaharness)**.
+See **[buildaharness.com](https://buildaharness.com)** and **[github.com/3IVIS/buildaharness](https://github.com/3IVIS/buildaharness)**.
 
 ---
 
@@ -198,11 +216,13 @@ See **[github.com/3IVIS/buildaharness](https://github.com/3IVIS/buildaharness)**
 
 | | |
 |---|---|
-| Try Aielia in the browser | https://buildaharness.com/try |
-| Build A Harness project | https://buildaharness.com |
+| Aielia website | https://myaielia.com |
+| Try Aielia in the browser | https://myaielia.com/try |
+| How it works | https://myaielia.com/how-it-works |
+| Build A Harness (developer site) | https://buildaharness.com |
 | Source (monorepo) | https://github.com/3IVIS/buildaharness |
-| npm package | `@buildaharness/personal-assistant` |
-| Assistant deep-dive | [`packages/personal-assistant/README.md`](https://github.com/3IVIS/buildaharness/blob/main/packages/personal-assistant/README.md) |
+| npm package | [`@buildaharness/aielia`](https://www.npmjs.com/package/@buildaharness/aielia) |
+| Assistant deep-dive | [`packages/aielia/README.md`](https://github.com/3IVIS/buildaharness/blob/main/packages/aielia/README.md) |
 | Architecture | [`docs/architecture.md`](https://github.com/3IVIS/buildaharness/blob/main/docs/architecture.md) |
 | Threat model | [`docs/threat-model.md`](https://github.com/3IVIS/buildaharness/blob/main/docs/threat-model.md) |
 
